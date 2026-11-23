@@ -1,0 +1,104 @@
+
+.enquiry-page {
+    min-height: 100vh;
+  }
+
+  .enquiry-container {
+    max-width: 680px;
+    margin: 70px auto;
+    padding: 0 24px;
+  }
+
+  .enquiry-container h1 {
+    font-size: clamp(42px, 7vw, 64px);
+    margin: 12px 0;
+    line-height: 1.1;
+  }
+
+  .enquiry-intro {
+    color: #777;
+    line-height: 1.8;
+    margin: 20px 0 40px;
+  }
+
+  .enquiry-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .enquiry-form label {
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 12px;
+  }
+
+  .enquiry-form input,
+  .enquiry-form textarea {
+    width: 100%;
+    padding: 15px 16px;
+    border: 1px solid #dedbd3;
+    background: #fff;
+    font-family: inherit;
+    font-size: 14px;
+    color: #303b32;
+    outline: none;
+    resize: vertical;
+  }
+
+  .enquiry-form input:focus,
+  .enquiry-form textarea:focus {
+    border-color: #536b55;
+  }
+
+  .enquiry-form button {
+    margin-top: 20px;
+    padding: 17px;
+    border: none;
+    background: #303b32;
+    color: #fff;
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .enquiry-form button:hover {
+    background: #536b55;
+  }
+
+  .enquiry-form button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .form-error {
+    color: #b42318;
+    font-size: 13px;
+  }
+
+  .success-message {
+    padding: 35px;
+    background: #f1f3ee;
+    margin-top: 30px;
+  }
+
+  .success-message h2 {
+    margin-bottom: 12px;
+  }
+
+  .success-message p {
+    color: #666;
+    margin-bottom: 20px;
+  }
+
+  .success-message a {
+    color: #303b32;
+    font-weight: 600;
+  }
+
+  @media (max-width: 600px) {
+    .enquiry-container {
+      margin: 40px auto;
+    }
+  }
