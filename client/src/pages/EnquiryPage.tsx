@@ -1,6 +1,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import { submitEnquiry } from "../services/api";
 import "./EnquiryPage.css";
 
 interface EnquiryFormData {
@@ -38,22 +39,7 @@ function EnquiryPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/enquiries`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(form),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || "Unable to send enquiry.");
-      }
+      await submitEnquiry(form);
 
       setSuccess(true);
       setForm({

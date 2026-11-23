@@ -17,39 +17,70 @@ export interface Product {
 
 interface ApiResponse<T> {
   success: boolean;
-  data: T;
+  data?: T;
+  message?: string;
 }
 
-async function request<T>(endpoint: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`);
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+async function request<T>(endpoint: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, init);
+  const result = await response.json().catch(() => null) as ApiResponse<T> | null;
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    throw new ApiError(result?.message || `API request failed: ${response.status}`, response.status);
   }
 
-  const result: ApiResponse<T> = await response.json();
+  if (!result || result.success !== true || !("data" in result)) {
+    throw new ApiError("The server returned an invalid response.", response.status);
+  }
 
-  return result.data;
+  return "data" in result ? result.data as T : result as T;
 }
 
-export function fetchProducts(search?: string): Promise<Product[]> {
+export function fetchProducts(search?: string, signal?: AbortSignal, category?: string): Promise<Product[]> {
   const params = new URLSearchParams();
 
   if (search?.trim()) {
     params.set("search", search.trim());
   }
+  if (category?.trim()) params.set("category", category.trim());
 
   const query = params.toString();
 
   return request<Product[]>(
-    `/api/products${query ? `?${query}` : ""}`
+    `/api/products${query ? `?${query}` : ""}`,
+    { signal }
   );
 }
 
-export function fetchCategories(): Promise<string[]> {
-  return request<string[]>("/api/categories");
+export function fetchCategories(signal?: AbortSignal): Promise<string[]> {
+  return request<string[]>("/api/categories", { signal });
 }
 
-export function fetchProductById(id: number): Promise<Product> {
-  return request<Product>(`/api/products/${id}`);
+export function fetchProductById(id: number, signal?: AbortSignal): Promise<Product> {
+  return request<Product>(`/api/products/${id}`, { signal });
+}
+
+export interface Enquiry {
+  name: string;
+  email: string;
+  product: string;
+  message: string;
+}
+
+export function submitEnquiry(enquiry: Enquiry): Promise<{ message: string }> {
+  return request<{ message: string }>("/api/enquiries", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(enquiry),
+  });
 }

@@ -1,5 +1,6 @@
 
 import nodemailer from "nodemailer";
+import { z } from "zod";
 
 interface EnquiryEmail {
   name: string;
@@ -19,14 +20,16 @@ export async function sendEnquiryEmail(
     SALES_EMAIL,
   } = process.env;
 
-  if (!SMTP_HOST || !SMTP_PORT || !SALES_EMAIL) {
+  const port = Number(SMTP_PORT);
+  const invalidAuth = Boolean(SMTP_USER) !== Boolean(SMTP_PASSWORD);
+  if (!SMTP_HOST || !Number.isInteger(port) || port < 1 || port > 65535 || invalidAuth || !z.string().email().safeParse(SALES_EMAIL).success) {
     throw new Error("Email service is not configured");
   }
 
   const transporter = nodemailer.createTransport({
     host: SMTP_HOST,
-    port: Number(SMTP_PORT),
-    secure: Number(SMTP_PORT) === 465,
+    port,
+    secure: port === 465,
     auth:
       SMTP_USER && SMTP_PASSWORD
         ? {
@@ -37,7 +40,7 @@ export async function sendEnquiryEmail(
   });
 
   await transporter.sendMail({
-    from: SMTP_USER || SALES_EMAIL,
+    from: SALES_EMAIL,
     to: SALES_EMAIL,
     replyTo: enquiry.email,
     subject: `Product enquiry: ${enquiry.product}`,

@@ -2,29 +2,35 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
+  ApiError,
   fetchProductById,
   type Product,
 } from "../services/api";
 
 function ProductDetails() {
   const { id } = useParams<{ id: string }>();
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [result, setResult] = useState<{ id: string; product?: Product; error?: string } | null>(null);
+  const validId = Boolean(id && /^\d+$/.test(id) && Number(id) > 0);
 
   useEffect(() => {
-    if (!id) {
-      setError("Product not found.");
-      setLoading(false);
-      return;
-    }
+    const controller = new AbortController();
+    if (!id || !/^\d+$/.test(id) || Number(id) <= 0) return () => controller.abort();
 
-    fetchProductById(Number(id))
-      .then(setProduct)
-      .catch(() => setError("Unable to load this product."))
-      .finally(() => setLoading(false));
+    fetchProductById(Number(id), controller.signal)
+      .then((product) => {
+        if (!controller.signal.aborted) setResult({ id, product });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
+        setResult({ id, error: error instanceof ApiError && error.status === 404 ? "Product not found." : "Unable to load this product." });
+      });
+    return () => controller.abort();
   }, [id]);
 
+  if (!validId) return <main className="catalogue"><p role="alert">Product not found.</p><Link to="/">Back to catalogue</Link></main>;
+  const loading = result?.id !== id;
+  const product = loading ? null : result?.product || null;
+  const error = loading ? "" : result?.error || "";
   if (loading) return <main className="catalogue">Loading product...</main>;
 
   if (error || !product) {

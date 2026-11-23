@@ -40,30 +40,58 @@ The frontend never calls Fake Store API directly. All product data is retrieved 
 
 ```text
 product-catalogue/
-├── client/
-│   └── src/
-│       ├── pages/
-│       ├── services/
-│       ├── App.tsx
-│       └── App.css
-├── server/
-│   ├── src/
-│   │   ├── integrations/
-│   │   │   ├── email-provider.ts
-│   │   │   └── product-provider.ts
-│   │   ├── __tests__/
-│   │   │   └── health.test.ts
-│   │   ├── app.ts
-│   │   └── index.ts
-│   └── .env.example
+├── .gitignore
 ├── DECISIONS.md
 ├── AI_USAGE.md
-└── README.md
+├── README.md
+├── client/
+│   ├── .gitignore
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── vite.config.ts
+│   ├── tsconfig.json
+│   ├── tsconfig.app.json
+│   ├── tsconfig.node.json
+│   ├── public/
+│   │   ├── favicon.svg
+│   │   └── icons.svg
+│   └── src/
+│       ├── assets/
+│       │   └── hero.png
+│       ├── components/
+│       │   └── ProductCard.tsx
+│       ├── pages/
+│       │   ├── CategoryPage.tsx
+│       │   ├── EnquiryPage.tsx
+│       │   ├── EnquiryPage.css
+│       │   └── ProductDetails.tsx
+│       ├── services/
+│       │   └── api.ts
+│       ├── App.tsx
+│       ├── App.css
+│       ├── index.css
+│       └── main.tsx
+└── server/
+    ├── .env.example
+    ├── package.json
+    ├── package-lock.json
+    ├── tsconfig.json
+    └── src/
+        ├── integrations/
+        │   ├── email-provider.ts
+        │   └── product-provider.ts
+        ├── __tests__/
+        │   ├── health.test.ts
+        │   └── product-not-found.test.ts
+        ├── app.ts
+        └── index.ts
 ```
 
 ## Prerequisites
 
-- Node.js 20 or later
+- Node.js 22.12.0 or later on a Vitest-supported release line. Node.js 22 LTS or 24 LTS is recommended.
 - npm
 - Git
 
@@ -156,6 +184,8 @@ Example configuration from `server/.env.example`:
 
 ```env
 PORT=3000
+ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+TRUST_PROXY_HOPS=0
 
 SMTP_HOST=127.0.0.1
 SMTP_PORT=1025
@@ -175,6 +205,10 @@ Mailpit defaults used by this project:
 For production, configure an appropriate SMTP provider and sales inbox.
 
 The frontend API URL can be configured using `VITE_API_BASE_URL`. If omitted, it defaults to `http://localhost:3000`.
+`ALLOWED_ORIGINS` is a comma-separated list of browser origins allowed by the API. Set it to the deployed frontend origin in production.
+`TRUST_PROXY_HOPS` defaults to `0`. Set it to the number of trusted reverse-proxy hops when deploying behind a known proxy so per-client rate limits use the client address.
+
+The enquiry endpoint limits each client address to five submissions per 15 minutes. This in-memory limit is intended for a single MVP server instance; multi-instance deployments should use a shared rate-limit store and appropriate proxy configuration.
 
 ## API Endpoints
 
@@ -183,19 +217,38 @@ The frontend API URL can be configured using `VITE_API_BASE_URL`. If omitted, it
 | GET | `/api/health` | Health check |
 | GET | `/api/products` | Retrieve products |
 | GET | `/api/products?search=<term>` | Search products |
+| GET | `/api/products?category=<category>` | Retrieve products in a category |
 | GET | `/api/products/:id` | Retrieve product details |
 | GET | `/api/categories` | Retrieve categories |
 | POST | `/api/enquiries` | Submit a product enquiry |
 
-## Running Tests
+## Validation
+
+### Frontend validation
+
+From the client directory:
+
+```bash
+cd client
+npm run build
+npm run lint
+```
+
+- `npm run build` runs TypeScript checks and creates the production build.
+- `npm run lint` runs ESLint checks.
+
+The frontend package does not define an automated test script.
+
+### Backend automated tests
 
 From the server directory:
 
 ```bash
+cd server
 npm test
 ```
 
-The backend tests use Vitest and Supertest. External product and email providers are mocked to keep tests deterministic and independent of external services.
+Backend automated tests use Vitest and Supertest. External network and email calls are mocked or stubbed so the tests do not depend on live services.
 
 ## Design Decisions
 

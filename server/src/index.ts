@@ -1,11 +1,19 @@
 
-import dotenv from "dotenv";
+import "dotenv/config";
 import app from "./app";
 
-dotenv.config();
+async function start() {
+  const port = Number(process.env.PORT || 3000);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("PORT must be an integer between 1 and 65535");
+  }
 
-const PORT = process.env.PORT || 3000;
+  app.listen(port, () => {
+    console.log(`Server listening on port ${port}`);
+  });
+}
 
-app.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+start().catch((error: unknown) => {
+  console.error("Unable to start server:", error);
+  process.exitCode = 1;
 });

@@ -1,40 +1,37 @@
-
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchProducts, type Product } from "../services/api";
+import ProductCard from "../components/ProductCard";
 
 function CategoryPage() {
-  const { category } = useParams<{ category: string }>();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { category = "" } = useParams<{ category: string }>();
+  const [result, setResult] = useState<{ category: string; products?: Product[]; error?: string } | null>(null);
 
   useEffect(() => {
-    fetchProducts()
-      .then(setProducts)
-      .catch(() => setError("Unable to load category products."))
-      .finally(() => setLoading(false));
-  }, []);
+    const controller = new AbortController();
+    fetchProducts(undefined, controller.signal, category)
+      .then((products) => {
+        if (!controller.signal.aborted) setResult({ category, products });
+      })
+      .catch((err: unknown) => {
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          setResult({ category, error: "Unable to load category products." });
+        }
+      });
+    return () => controller.abort();
+  }, [category]);
 
-  const categoryProducts = useMemo(() => {
-    return products
-      .filter(
-        (product) =>
-          product.category === decodeURIComponent(category || "")
-      )
-      .sort((a, b) => b.rating.rate - a.rating.rate);
-  }, [products, category]);
-
+  const loading = result?.category !== category;
+  const error = loading ? "" : result?.error || "";
+  const categoryProducts = useMemo(
+    () => [...(loading ? [] : result?.products || [])].sort((a, b) => b.rating.rate - a.rating.rate),
+    [loading, result]
+  );
   const topRatedProducts = categoryProducts.slice(0, 5);
   const additionalProducts = categoryProducts.slice(5);
 
-  if (loading) {
-    return <main className="catalogue">Loading category...</main>;
-  }
-
-  if (error) {
-    return <main className="catalogue"><p role="alert">{error}</p></main>;
-  }
+  if (loading) return <main className="catalogue">Loading category...</main>;
+  if (error) return <main className="catalogue"><p role="alert">{error}</p><Link to="/">Back to catalogue</Link></main>;
 
   return (
     <main className="catalogue">
@@ -42,77 +39,23 @@ function CategoryPage() {
         <Link className="logo" to="/">COLLECTIVE.</Link>
         <Link to="/">← Back to catalogue</Link>
       </header>
-
       <section className="hero">
         <p className="eyebrow">EXPLORE THE COLLECTION</p>
         <h1>{category}</h1>
         <p>{categoryProducts.length} products in this collection.</p>
       </section>
-
       <section className="products-section">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">COMMUNITY FAVOURITES</p>
-            <h2>Top rated in {category}</h2>
-          </div>
-        </div>
-
-        {topRatedProducts.length === 0 ? (
-          <p>No products found in this category.</p>
-        ) : (
-          <div className="product-grid">
-            {topRatedProducts.map((product) => (
-              <Link
-                to={`/products/${product.id}`}
-                className="product-card product-card-link"
-                key={product.id}
-              >
-                <div className="product-image">
-                  <img src={product.image} alt={product.title} />
-                  <span className="rating">
-                    ★ {product.rating.rate.toFixed(1)}
-                  </span>
-                </div>
-                <p className="category">{product.category}</p>
-                <h3>{product.title}</h3>
-                <p className="price">${product.price.toFixed(2)}</p>
-              </Link>
-            ))}
-          </div>
+        <div className="section-heading"><div><p className="eyebrow">COMMUNITY FAVOURITES</p><h2>Top rated in {category}</h2></div></div>
+        {topRatedProducts.length === 0 ? <p>No products found in this category.</p> : (
+          <div className="product-grid">{topRatedProducts.map((product) => <ProductCard key={product.id} product={product} />)}</div>
         )}
       </section>
-
       {additionalProducts.length > 0 && (
         <section className="products-section">
-          <div className="section-heading">
-            <div>
-              <p className="eyebrow">MORE TO DISCOVER</p>
-              <h2>More from this collection</h2>
-            </div>
-          </div>
-
-          <div className="product-grid">
-            {additionalProducts.map((product) => (
-              <Link
-                to={`/products/${product.id}`}
-                className="product-card product-card-link"
-                key={product.id}
-              >
-                <div className="product-image">
-                  <img src={product.image} alt={product.title} />
-                  <span className="rating">
-                    ★ {product.rating.rate.toFixed(1)}
-                  </span>
-                </div>
-                <p className="category">{product.category}</p>
-                <h3>{product.title}</h3>
-                <p className="price">${product.price.toFixed(2)}</p>
-              </Link>
-            ))}
-          </div>
+          <div className="section-heading"><div><p className="eyebrow">MORE TO DISCOVER</p><h2>More from this collection</h2></div></div>
+          <div className="product-grid">{additionalProducts.map((product) => <ProductCard key={product.id} product={product} />)}</div>
         </section>
       )}
-
       <footer>COLLECTIVE. — A catalogue of considered choices.</footer>
     </main>
   );

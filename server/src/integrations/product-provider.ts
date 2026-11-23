@@ -1,38 +1,81 @@
+import { z } from "zod";
 
 const API_BASE_URL = "https://fakestoreapi.com";
+const CACHE_TTL_MS = 60_000;
+const REQUEST_TIMEOUT_MS = 5_000;
 
-export interface Product {
-  id: number;
-  title: string;
-  price: number;
-  description: string;
-  category: string;
-  image: string;
-  rating: {
-    rate: number;
-    count: number;
-  };
+const productSchema = z.object({
+  id: z.number().int().positive(),
+  title: z.string(),
+  price: z.number().finite(),
+  description: z.string(),
+  category: z.string(),
+  image: z.string().url(),
+  rating: z.object({
+    rate: z.number().finite(),
+    count: z.number().int().nonnegative(),
+  }),
+});
+const productsSchema = z.array(productSchema);
+const categoriesSchema = z.array(z.string());
+
+export type Product = z.infer<typeof productSchema>;
+
+export class ProductNotFoundError extends Error {
+  constructor() {
+    super("Product not found");
+    this.name = "ProductNotFoundError";
+  }
+}
+
+let productsCache: { value: Product[]; expiresAt: number } | undefined;
+let productsRequest: Promise<Product[]> | undefined;
+let categoriesCache: { value: string[]; expiresAt: number } | undefined;
+
+async function fetchJson<T>(
+  url: string,
+  schema: z.ZodType<T>,
+  emptyBodyIsNotFound = false
+): Promise<T> {
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  if (response.status === 404) throw new ProductNotFoundError();
+  if (!response.ok) throw new Error(`Product provider returned ${response.status}`);
+
+  if (emptyBodyIsNotFound) {
+    const body = await response.text();
+    if (!body.trim()) throw new ProductNotFoundError();
+    return schema.parse(JSON.parse(body));
+  }
+
+  return schema.parse(await response.json());
 }
 
 export async function getProducts(): Promise<Product[]> {
-  const response = await fetch(`${API_BASE_URL}/products`);
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch products");
+  if (productsCache && productsCache.expiresAt > Date.now()) {
+    return productsCache.value;
   }
+  if (productsRequest) return productsRequest;
 
-  return response.json() as Promise<Product[]>;
+  productsRequest = fetchJson(`${API_BASE_URL}/products`, productsSchema)
+    .then((products) => {
+      productsCache = { value: products, expiresAt: Date.now() + CACHE_TTL_MS };
+      return products;
+    })
+    .finally(() => {
+      productsRequest = undefined;
+    });
+
+  return productsRequest;
 }
 
-export async function searchProducts(
-  searchTerm: string
-): Promise<Product[]> {
+export async function searchProducts(searchTerm: string): Promise<Product[]> {
   const products = await getProducts();
   const term = searchTerm.trim().toLowerCase();
 
-  if (!term) {
-    return products;
-  }
+  if (!term) return products;
 
   return products.filter((product) =>
     product.title.toLowerCase().includes(term) ||
@@ -41,24 +84,26 @@ export async function searchProducts(
   );
 }
 
-export async function getProductById(
-  id: number
-): Promise<Product> {
-  const response = await fetch(`${API_BASE_URL}/products/${id}`);
+export async function getProductsByCategory(category: string): Promise<Product[]> {
+  return fetchJson(
+    `${API_BASE_URL}/products/category/${encodeURIComponent(category)}`,
+    productsSchema
+  );
+}
 
-  if (!response.ok) {
-    throw new Error("Product not found");
-  }
-
-  return response.json() as Promise<Product>;
+export async function getProductById(id: number): Promise<Product> {
+  return fetchJson(`${API_BASE_URL}/products/${id}`, productSchema, true);
 }
 
 export async function getCategories(): Promise<string[]> {
-  const response = await fetch(`${API_BASE_URL}/products/categories`);
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch categories");
+  if (categoriesCache && categoriesCache.expiresAt > Date.now()) {
+    return categoriesCache.value;
   }
 
-  return response.json() as Promise<string[]>;
+  const categories = await fetchJson(
+    `${API_BASE_URL}/products/categories`,
+    categoriesSchema
+  );
+  categoriesCache = { value: categories, expiresAt: Date.now() + CACHE_TTL_MS };
+  return categories;
 }
